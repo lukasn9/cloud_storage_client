@@ -1,11 +1,27 @@
 import os
 import cv2
+import sys
+import yt_dlp
 from .clear_terminal import clear_terminal
 
 def decode():
     clear_terminal()
+    inp = str(input("Decode from an URL/Path (1/2/Exit): "))
 
-    video_path = input("Enter the path of the video: ")
+    if inp == "1":
+        video_url = input("Enter the URL of the video: ")
+        ydl_opts = {
+            "format": "best",
+            "outtmpl": f"Data/temp/%(title)s.%(ext)s",
+        }
+        video_path = f"Data/temp/%(title)s.%(ext)s"
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([video_url])
+    elif inp == "2":
+        video_path = input("Enter the path of the video: ")
+    else:
+        sys.exit(0)
     
     video = cv2.VideoCapture(video_path)
     if not video.isOpened():
@@ -105,5 +121,8 @@ def decode():
 
     print(f"Decoding complete. File saved as {output_path}")
 
+    if inp == "1":
+        os.remove(video_path)
+        
     print()
     inp = input("Press Enter to continue: ")

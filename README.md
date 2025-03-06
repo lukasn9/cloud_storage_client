@@ -1,5 +1,5 @@
 # YouTube Cloud Storage Client
-Save all your files to the cloud, free of charge, unlimited space. This client converts all file types to an mp4, stores it on YouTube, and very easily converts it back into the original file. <strong>Experimental<strong> - the client is currently in development and supports only files bigger than 1 MB (the actual value could be smaller, further testing needed).
+Save all your files to the cloud, free of charge, unlimited space. This client converts all file types to an mp4, stores it on YouTube, and very easily converts it back into the original file. <strong>Experimental</strong> - the client is currently in development and supports only files bigger than 1 MB (the actual value could be smaller, further testing needed).
 
 ## Setup
 The setup is quite simple. All you need to do is create a project through the Google Cloud Console, enable the YouTube Data API v3, create an OAuth 2.0 client and insert the credentials into the program. I'll guide you through it.
