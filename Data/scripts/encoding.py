@@ -11,9 +11,10 @@ from googleapiclient.discovery import build
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
 def get_youtube_service():
-    flow = InstalledAppFlow.from_client_secrets_file(
-        "client_secrets.json", SCOPES
-    )
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    client_secret_path = os.path.join(script_dir, "..", "client_secret.json")
+
+    flow = InstalledAppFlow.from_client_secrets_file(client_secret_path, SCOPES)
     credentials = flow.run_local_server(port=0)
     return build("youtube", "v3", credentials=credentials)
 
@@ -49,8 +50,8 @@ class YouTubeAPI:
 
 def encode():
     clear_terminal()
-    youtube = get_youtube_service()
     file_path = input("Enter the path of the file: ")
+    youtube = get_youtube_service()
     
     base_name = os.path.basename(file_path)
     name_without_ext = os.path.splitext(base_name)[0]
