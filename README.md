@@ -4,6 +4,8 @@ Save all your files to the cloud, free of charge, unlimited space. This client c
 ## Setup
 The setup is quite simple. All you need to do is create a project through the Google Cloud Console, enable the YouTube Data API v3, create an OAuth 2.0 client and insert the credentials into the program. I'll guide you through it.
 
+- Install the dependencies in `requirements.txt`.
+- Run `app.py` in the terminal using `python app.py`, while in the same directory. This will start the setup. You can follow the steps written here, or in the app itself.
 - [Google Cloud Console Dashboard](https://console.cloud.google.com/apis/dashboard) Just click the link, sign in with your Google account and create a new project with the button on the top right.
 - After creating your project, go through the navigation menu to the `API & Services` tab, then `Library`, and search YouTube. The first item that pops up should be the YouTube Data API v3. Click on it and enable it.
 - After that, go back through `API & Services` to `Credentials`. Create an OAuth 2.0 Client ID there. After filling in the information, a popup should pop up. There will be a button saying `Download JSON`. Keep this JSON safe, you're going to need it.
