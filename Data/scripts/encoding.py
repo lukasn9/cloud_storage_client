@@ -93,7 +93,6 @@ def encode():
             binary_data += ''.join(format(byte, '08b') for byte in chunk)
 
     binary_data += extension_bits
-
     total_data_frames = (len(binary_data) + ppf - 1) // ppf
 
     print(f"Updated total data frames: {total_data_frames}")
