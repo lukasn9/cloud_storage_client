@@ -1,6 +1,9 @@
 import os
 import cv2
 import numpy as np
+import sys
+from time import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .clear_terminal import clear_terminal
 from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -46,8 +49,26 @@ class YouTubeAPI:
         response = request.execute()
         return response
 
+def generate_frame(index, chunk, width, height):
+    frame = np.ones((height, width), dtype=np.uint8) * 255  
+    chunk = chunk.ljust(width * height, '0')
+
+    for i, bit in enumerate(chunk):
+        row, col = divmod(i, width)
+        if bit == "1":
+            frame[row, col] = 0
+
+    return index, cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+
 def encode():
-    youtube = get_youtube_service()
+    clear_terminal()
+    inp = str(input("Encode and save to YouTube/locally (1/2/Exit): "))
+
+    if inp == "1":
+        youtube = get_youtube_service()
+    elif inp != "2":
+        sys.exit(0)
+
     clear_terminal()
     file_path = input("Enter the path of the file: ")
 
@@ -79,63 +100,63 @@ def encode():
 
     print(f"Encoding file extension: {file_extension} as {extension_padded} -> {extension_bits}")
 
-    total_data_frames = (file_size * 8 + ppf - 1) // ppf
-    total_video_frames = total_data_frames * frames_per_data_frame
-
-    print(f"Encoding {file_size} bytes into {total_data_frames} unique data frames.")
-    print(f"Each frame will be repeated {frames_per_data_frame} times.")
-    print(f"Total video frames: {total_video_frames}")
-
     binary_data = ""
-
     with open(file_path, "rb") as file:
         while chunk := file.read(bytes_per_frame):
             binary_data += ''.join(format(byte, '08b') for byte in chunk)
 
     binary_data += extension_bits
     total_data_frames = (len(binary_data) + ppf - 1) // ppf
+    total_video_frames = total_data_frames * frames_per_data_frame
 
-    print(f"Updated total data frames: {total_data_frames}")
+    print(f"Encoding {file_size} bytes into {total_data_frames} unique data frames.")
+    print(f"Each frame will be repeated {frames_per_data_frame} times.")
+    print(f"Total video frames: {total_video_frames}")
 
-    for frame_idx in range(total_data_frames):
-        frame = np.ones((height, width), dtype=np.uint8) * 255  
-        
-        chunk = binary_data[frame_idx * ppf:(frame_idx + 1) * ppf]
-        chunk = chunk.ljust(ppf, '0')
+    start = time()
 
-        for i, bit in enumerate(chunk):
-            row, col = divmod(i, width)
-            if bit == "1":
-                frame[row, col] = 0
+    frames = []
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for frame_idx in range(total_data_frames):
+            chunk = binary_data[frame_idx * ppf:(frame_idx + 1) * ppf]
+            futures.append(executor.submit(generate_frame, frame_idx, chunk, width, height))
 
-        bgr_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-        
+        for future in as_completed(futures):
+            frames.append(future.result())
+
+    frames.sort(key=lambda x: x[0])
+    
+    for frame_idx, frame in frames:
         for _ in range(frames_per_data_frame):
-            video_writer.write(bgr_frame)
+            video_writer.write(frame)
             
         print(f"Progress: {frame_idx + 1}/{total_data_frames} data frames "
               f"({(frame_idx + 1) * frames_per_data_frame}/{total_video_frames} video frames) "
               f"({(frame_idx + 1) * 100 // total_data_frames}%)")
 
     video_writer.release()
-    print("Encoding complete.")
+    end = time()
+    
+    print(f"Encoding took {round(end - start, 2)} seconds.")
 
     absolute_output_path = os.path.abspath(output_path)
     print(f"Video saved to: {absolute_output_path}")
     print(f"Total frames in video: {total_data_frames * frames_per_data_frame}")
     print(f"Video duration: {total_video_frames / fps:.2f} seconds")
 
-    try:
-        yt_api = YouTubeAPI(youtube)
-        upload = yt_api.upload_video(
-            absolute_output_path, 
-            name_without_ext, 
-            file_extension,
-            28  
-        )
-        print("Video upload complete.")
-    except Exception as e:
-        print(f"Error during upload: {str(e)}")
+    if inp == "1":
+        try:
+            yt_api = YouTubeAPI(youtube)
+            upload = yt_api.upload_video(
+                absolute_output_path, 
+                name_without_ext, 
+                file_extension,
+                28  
+            )
+            print("Video upload complete.")
+        except Exception as e:
+            print(f"Error during upload: {str(e)}")
 
     print()
     inp = input("Press Enter to continue: ")
