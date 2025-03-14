@@ -17,3 +17,4 @@ The setup is quite simple. All you need to do is create a project through the Go
 
 ## Bugs
 - It is possible that when trying to upload a file to YouTube,  even with a Google Cloud project created, Google will not give you a permission to use it when you try to log in. In that case, just add your account to the `Test users` list, in the `OAuth consent screen`/`Audience` tab.
+- If the program still doesn't work after installing `requirements.txt`, install `CV2` manually by using `pip install opencv-python`.
