@@ -1,6 +1,7 @@
 import os
 import webbrowser
 import sys
+import json
 
 setup_steps = [
     "Step 1: Open Google Cloud Console Dashboard.",

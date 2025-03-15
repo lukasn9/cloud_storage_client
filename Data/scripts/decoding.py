@@ -13,6 +13,7 @@ def decode():
     video_path = None
     downloaded_file = None
 
+    clear_terminal()
     if inp == "1":
         video_url = input("Enter the URL of the video: ")
         
@@ -39,6 +40,7 @@ def decode():
             
     elif inp == "2":
         video_path = input("Enter the path of the video: ")
+        video_path = video_path.strip('"')
     else:
         sys.exit(0)
     
@@ -54,7 +56,10 @@ def decode():
     frame_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    ppf = width * height
+    
+    block_size = 5
+    grid_width, grid_height = width // block_size, height // block_size
+    ppf = grid_width * grid_height
     frames_per_data_frame = 5
 
     print("Decoding...")
@@ -68,7 +73,7 @@ def decode():
     data = []
     
     for data_frame_idx in range(total_data_frames):
-        accumulated_frame = np.zeros((height, width), dtype=np.float32)
+        accumulated_frame = np.zeros((grid_height, grid_width), dtype=np.float32)
         
         frames_read = 0
         for _ in range(frames_per_data_frame):
@@ -78,24 +83,26 @@ def decode():
                 break
                 
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            accumulated_frame += gray_frame.astype(np.float32)
+            
+            for row in range(grid_height):
+                for col in range(grid_width):
+                    y, x = row * block_size, col * block_size
+                    block = gray_frame[y:y+block_size, x:x+block_size]
+                    accumulated_frame[row, col] += np.mean(block)
+            
             frames_read += 1
             
         if frames_read < frames_per_data_frame:
             print(f"Warning: Incomplete frame group, expected {frames_per_data_frame} frames but got {frames_read}")
             continue
-            
-        averaged_frame = accumulated_frame / frames_per_data_frame
         
+        averaged_frame = accumulated_frame / frames_per_data_frame
         _, binary_frame = cv2.threshold(averaged_frame, 127.5, 1, cv2.THRESH_BINARY_INV)
         
         binary_frame = binary_frame.astype(np.uint8)
         
-        for row in range(height):
-            for col in range(width):
-                if row * width + col < ppf:
-                    data.append(str(binary_frame[row, col]))
-
+        data.extend(binary_frame.flatten().astype(str))
+        
         print(f"Progress: {data_frame_idx + 1}/{total_data_frames} data frames ({(data_frame_idx + 1) * 100 // total_data_frames}%)")
     
     video.release()
@@ -117,67 +124,52 @@ def decode():
         data_string = data_string[:-48]
         
         for i in range(0, 48, 8):
-            if i + 8 <= len(extension_bits):
-                char_bits = extension_bits[i:i+8]
-                try:
-                    char_value = int(char_bits, 2)
-                    if char_value > 0:
-                        if 32 <= char_value <= 126:
-                            extension += chr(char_value)
-                        else:
-                            print(f"Skipping non-printable character: {char_value}")
-                except ValueError as e:
-                    print(f"Error parsing binary: {e}")
+            char_bits = extension_bits[i:i+8]
+            try:
+                char_value = int(char_bits, 2)
+                if 32 <= char_value <= 126:
+                    extension += chr(char_value)
+            except ValueError:
+                continue
         
-        hash_padding_count = 0
-        while extension.endswith('#') and hash_padding_count < 3:
-            extension = extension[:-1]
-            hash_padding_count += 1
-            
+        extension = extension.rstrip('#')
+    
     extension = re.sub(r'[^a-zA-Z0-9.]', '', extension)
-    
     if not extension or len(extension) > 10:
-        extension = "txt"
-    
-    extension = "." + extension
-    
-    print(f"Detected file extension: {extension}")
+        extension = "bin"
+        extension = "." + extension
+        print(f"File extension couldn't be detected, defaulting to .bin")
+    else:
+        extension = "." + extension
+        print(f"Detected file extension: {extension}")
     
     byte_chunks = [data_string[i:i+8] for i in range(0, len(data_string), 8)]
-
     if len(byte_chunks) > 0 and len(byte_chunks[-1]) < 8:
         byte_chunks.pop()
-
+    
     decoded_bytes = bytearray()
     for chunk in byte_chunks:
         try:
             decoded_bytes.append(int(chunk, 2))
         except ValueError:
             continue
-
-    os.makedirs("Data/outputs", exist_ok=True)
-
+    
+    os.makedirs("Data/outputs/files", exist_ok=True)
     output_name = input("Enter the name for the output file (without extension): ")
-    output_path = f"Data/outputs/{output_name}{extension}"
+    output_path = f"Data/outputs/files/{output_name}{extension}"
     
     try:
         with open(output_path, "wb") as file:
             file.write(decoded_bytes)
         print(f"Decoding complete. File saved as {output_path}")
     except OSError as e:
-        safe_path = f"Data/outputs/{output_name}.bin"
+        safe_path = f"Data/outputs/files/{output_name}.bin"
         print(f"Error saving with detected extension: {str(e)}")
-        print(f"Saving with .bin extension instead")
         with open(safe_path, "wb") as file:
             file.write(decoded_bytes)
         print(f"Decoding complete. File saved as {safe_path}")
-
+    
     if downloaded_file and os.path.exists(downloaded_file):
-        try:
-            os.remove(downloaded_file)
-            print(f"Removed temporary file: {downloaded_file}")
-        except Exception as e:
-            print(f"Warning: Could not remove temporary file: {e}")
-        
-    print()
-    inp = input("Press Enter to continue: ")
+        os.remove(downloaded_file)
+    
+    input("Press Enter to continue: ")

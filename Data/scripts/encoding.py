@@ -49,14 +49,17 @@ class YouTubeAPI:
         response = request.execute()
         return response
 
-def generate_frame(index, chunk, width, height):
-    frame = np.ones((height, width), dtype=np.uint8) * 255  
-    chunk = chunk.ljust(width * height, '0')
+def generate_frame(index, chunk, width, height, block_size=5):
+    grid_width, grid_height = width // block_size, height // block_size
+    frame = np.ones((height, width), dtype=np.uint8) * 255
+
+    chunk = chunk.ljust(grid_width * grid_height, '0')
 
     for i, bit in enumerate(chunk):
-        row, col = divmod(i, width)
+        row, col = divmod(i, grid_width)
         if bit == "1":
-            frame[row, col] = 0
+            y, x = row * block_size, col * block_size
+            frame[y:y+block_size, x:x+block_size] = 0
 
     return index, cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
@@ -70,7 +73,7 @@ def encode():
         sys.exit(0)
 
     clear_terminal()
-    file_path = input("Enter the path of the file: ")
+    file_path = input("Enter the path of the file: ").strip('"')
 
     if not os.path.exists(file_path):
         print("Error: File not found.")
@@ -82,12 +85,14 @@ def encode():
 
     frames_per_data_frame = 5
     width, height = 2560, 1440
-    ppf = width * height
+    block_size = 5
+    grid_width, grid_height = width // block_size, height // block_size
+    ppf = grid_width * grid_height
     fps = 60
     output_filename = f"{name_without_ext}.mp4"
     
-    os.makedirs("Data/outputs", exist_ok=True)
-    output_path = os.path.join("Data/outputs", output_filename)
+    os.makedirs("Data/outputs/videos", exist_ok=True)
+    output_path = os.path.join("Data/outputs/videos", output_filename)
     
     fourcc = cv2.VideoWriter_fourcc(*'avc1')
     video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -110,7 +115,6 @@ def encode():
     total_video_frames = total_data_frames * frames_per_data_frame
 
     print(f"Encoding {file_size} bytes into {total_data_frames} unique data frames.")
-    print(f"Each frame will be repeated {frames_per_data_frame} times.")
     print(f"Total video frames: {total_video_frames}")
 
     start = time()
@@ -120,7 +124,7 @@ def encode():
         futures = []
         for frame_idx in range(total_data_frames):
             chunk = binary_data[frame_idx * ppf:(frame_idx + 1) * ppf]
-            futures.append(executor.submit(generate_frame, frame_idx, chunk, width, height))
+            futures.append(executor.submit(generate_frame, frame_idx, chunk, width, height, block_size))
 
         for future in as_completed(futures):
             frames.append(future.result())
